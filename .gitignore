@@ -1,0 +1,9 @@
+# 本地工具和操作系统文件
+.DS_Store
+.idea/
+.vscode/
+coverage/
+dist/
+
+# 本地导出备份可能包含 TOTP 密钥
+authenticator-backup*.txt
