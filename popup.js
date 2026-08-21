@@ -22,6 +22,10 @@ const deleteConfirm = document.querySelector("#delete-confirm");
 const confirmAccount = document.querySelector("#confirm-account");
 const confirmCancel = document.querySelector("#confirm-cancel");
 const confirmDelete = document.querySelector("#confirm-delete");
+const accountQr = document.querySelector("#account-qr");
+const qrClose = document.querySelector("#qr-close");
+const qrAccount = document.querySelector("#qr-account");
+const qrImage = document.querySelector("#qr-image");
 const STORAGE_KEY = "mfaAccounts";
 const PERIOD = 30;
 const { base32ToBytes, generateTotp } = AuthenticatorTOTP;
@@ -79,6 +83,38 @@ function getAccountLabels(account) {
 }
 
 /**
+ * 生成可被通用身份验证器扫描的 TOTP 配置链接。
+ *
+ * @param {{issuer?: string, account?: string, name?: string, secret: string}} account 账户记录。
+ * @returns {string} otpauth 配置链接。
+ */
+function toOtpauthUri(account) {
+  const { issuer, account: accountName } = getAccountLabels(account);
+  const label = issuer
+    ? `${encodeURIComponent(issuer)}:${encodeURIComponent(accountName)}`
+    : encodeURIComponent(accountName);
+  const issuerParam = issuer ? `&issuer=${encodeURIComponent(issuer)}` : "";
+  return `otpauth://totp/${label}?secret=${encodeURIComponent(account.secret)}${issuerParam}`;
+}
+
+/**
+ * 展示账户配置二维码；编码完全在扩展本地完成。
+ *
+ * @param {{issuer?: string, account?: string, name?: string, secret: string}} account 账户记录。
+ * @returns {void}
+ */
+function showAccountQr(account) {
+  const { issuer, account: accountName } = getAccountLabels(account);
+  const code = qrcode(0, "M");
+  code.addData(toOtpauthUri(account), "Byte");
+  code.make();
+  qrAccount.textContent = issuer && accountName ? `${issuer}（${accountName}）` : issuer || accountName;
+  qrImage.src = code.createDataURL(4, 4);
+  accountQr.hidden = false;
+  qrClose.focus();
+}
+
+/**
  * 渲染已保存账户，避免存储变更触发的并发渲染相互交错。
  *
  * @returns {Promise<void>} 完成 Promise。
@@ -105,7 +141,12 @@ async function renderAccounts() {
         <div class="account-meta"></div>
         <div class="code-row"><span class="token-code">------</span><span class="copy-hint" hidden>已复制</span></div>
       </div>
-      <span class="countdown" data-seconds="30"></span>
+      <div class="account-controls">
+        <button class="account-qr" type="button" aria-label="显示 ${labels.issuer} 的二维码" title="显示二维码">
+          <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path fill="currentColor" d="M3 3h7v7H3V3zm2 2v3h3V5H5zm9-2h7v7h-7V3zm2 2v3h3V5h-3zM3 14h7v7H3v-7zm2 2v3h3v-3H5zm8-2h2v2h-2v-2zm3 0h2v2h-2v-2zm-3 3h2v2h-2v-2zm3 0h2v2h-2v-2zm3-3h2v7h-2v-7zm-3 6h2v1h-2v-1z"/></svg>
+        </button>
+        <span class="countdown" data-seconds="30"></span>
+      </div>
       <button class="account-delete" type="button" aria-label="删除 ${labels.issuer}">×</button>
     `;
     item.querySelector(".account-meta").textContent = labels.issuer && labels.account
@@ -132,6 +173,7 @@ async function renderAccounts() {
       copyCode().catch(() => {});
     });
     item.addEventListener("keydown", (event) => {
+      if (event.target.closest("button")) return;
       if (event.key === "Enter" || event.key === " ") {
         event.preventDefault();
         if (accountsList.classList.contains("is-manage-mode")) return;
@@ -143,6 +185,10 @@ async function renderAccounts() {
       pendingDeleteId = account.id;
       confirmAccount.textContent = `${labels.issuer}（${labels.account}）`;
       deleteConfirm.hidden = false;
+    });
+    item.querySelector(".account-qr").addEventListener("click", (event) => {
+      event.stopPropagation();
+      showAccountQr(account);
     });
     accountsList.append(item);
   }
@@ -240,15 +286,7 @@ addSubmit?.addEventListener("click", async () => {
 exportAccountsButton?.addEventListener("click", async () => {
   const { [STORAGE_KEY]: accounts = [] } = await chrome.storage.local.get(STORAGE_KEY);
   if (!accounts.length) return;
-  const lines = accounts.map((account) => {
-    const { issuer, account: accountName } = getAccountLabels(account);
-    const hasIssuer = Boolean(issuer);
-    const label = hasIssuer
-      ? `${encodeURIComponent(issuer)}:${encodeURIComponent(accountName)}`
-      : encodeURIComponent(accountName);
-    const issuerParam = hasIssuer ? `&issuer=${encodeURIComponent(issuer)}` : "";
-    return `otpauth://totp/${label}?secret=${encodeURIComponent(account.secret)}${issuerParam}`;
-  });
+  const lines = accounts.map(toOtpauthUri);
   const url = URL.createObjectURL(new Blob([lines.join("\n")], { type: "text/plain;charset=utf-8" }));
   const link = document.createElement("a");
   link.href = url;
@@ -285,6 +323,11 @@ importSubmit?.addEventListener("click", async () => {
 confirmCancel?.addEventListener("click", () => {
   pendingDeleteId = null;
   deleteConfirm.hidden = true;
+});
+
+qrClose?.addEventListener("click", () => { accountQr.hidden = true; });
+accountQr?.addEventListener("click", (event) => {
+  if (event.target === accountQr) accountQr.hidden = true;
 });
 
 confirmDelete?.addEventListener("click", async () => {

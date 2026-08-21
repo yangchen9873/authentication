@@ -169,6 +169,30 @@ main {
 .account-delete:hover { background: #c63a4b; color: #fff; }
 .accounts.is-manage-mode .account-delete { display: grid; }
 
+.account-controls { display: flex; align-items: center; gap: 8px; }
+
+.account-qr {
+  display: grid;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  place-items: center;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity .15s ease, background .15s ease, color .15s ease;
+}
+
+.account-item:hover .account-qr,
+.account-item:focus-visible .account-qr,
+.account-item:focus-within .account-qr { opacity: 1; pointer-events: auto; }
+.account-qr:hover { background: var(--accent-soft); color: var(--accent); }
+.account-qr:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+
 .token-code {
   color: var(--code);
   font-family: "SF Mono", "Cascadia Mono", "JetBrains Mono", "Roboto Mono", SFMono-Regular, Menlo, Consolas, ui-monospace, monospace;
@@ -268,6 +292,22 @@ main {
   background: var(--surface);
   box-shadow: 0 18px 48px rgba(0, 0, 0, .2);
 }
+
+.qr-dialog {
+  display: grid;
+  width: 100%;
+  justify-items: center;
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  background: var(--surface);
+  box-shadow: 0 18px 48px rgba(0, 0, 0, .2);
+}
+
+.qr-dialog .import-title-row { width: 100%; }
+.qr-account { width: 100%; margin: 0 0 12px; color: var(--muted); font-size: 12px; overflow: hidden; text-align: center; text-overflow: ellipsis; white-space: nowrap; }
+.qr-image { display: block; width: 200px; height: 200px; image-rendering: pixelated; }
+.qr-help { margin: 12px 0 0; color: var(--muted); font-size: 11px; line-height: 16px; text-align: center; }
 
 .confirm-dialog h2 { margin: 0; color: var(--text); font-size: 15px; }
 .confirm-dialog p { margin: 7px 0 16px; color: var(--muted); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

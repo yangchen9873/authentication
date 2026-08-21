@@ -79,8 +79,20 @@
           </div>
         </div>
       </section>
+      <section id="account-qr" class="confirm-overlay" hidden>
+        <div class="qr-dialog" role="dialog" aria-modal="true" aria-labelledby="qr-title">
+          <div class="import-title-row">
+            <h2 id="qr-title">扫描二维码</h2>
+            <button id="qr-close" class="import-close" type="button" aria-label="关闭">×</button>
+          </div>
+          <p id="qr-account" class="qr-account"></p>
+          <img id="qr-image" class="qr-image" alt="验证器配置二维码" />
+          <p class="qr-help">请使用身份验证器应用扫描。二维码含有密钥，请勿分享。</p>
+        </div>
+      </section>
     </main>
     <script src="lib/totp.js"></script>
+    <script src="lib/qrcode.js"></script>
     <script src="popup.js"></script>
   </body>
 </html>
