@@ -90,13 +90,6 @@ main {
 
 .icon-button.is-active { border-color: var(--accent); background: var(--accent-soft); color: var(--accent); }
 
-.reorder-hint {
-  margin: 10px 0 -6px;
-  color: var(--accent);
-  font-size: 12px;
-  font-weight: 600;
-}
-
 .icon-button:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
@@ -132,11 +125,6 @@ main {
 
 .account-item:hover { border-color: color-mix(in srgb, var(--accent) 42%, var(--border)); background: var(--surface); box-shadow: 0 4px 12px rgba(22, 24, 29, .06); }
 .account-item:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-.account-item.is-dragging { opacity: .45; }
-.account-item.is-drop-target { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
-.accounts.is-reorder-mode .account-item { cursor: grab; }
-.accounts.is-reorder-mode .account-item:active { cursor: grabbing; }
-.accounts.is-reorder-mode .account-item { touch-action: none; }
 
 
 .account-details {
@@ -179,7 +167,7 @@ main {
 }
 
 .account-delete:hover { background: #c63a4b; color: #fff; }
-.accounts.is-reorder-mode .account-delete { display: grid; }
+.accounts.is-manage-mode .account-delete { display: grid; }
 
 .token-code {
   color: var(--code);
@@ -199,6 +187,7 @@ main {
   place-items: center;
   align-self: center;
   margin-right: 2px;
+  transform: translateX(-6px);
 }
 
 .countdown::after {

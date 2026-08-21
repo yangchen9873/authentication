@@ -2,8 +2,7 @@ const scanButton = document.querySelector("#scan-qr");
 const showAddButton = document.querySelector("#show-add");
 const showImportButton = document.querySelector("#show-import");
 const exportAccountsButton = document.querySelector("#export-accounts");
-const toggleReorderButton = document.querySelector("#toggle-reorder");
-const reorderHint = document.querySelector("#reorder-hint");
+const toggleManageButton = document.querySelector("#toggle-manage");
 const accountCount = document.querySelector("#account-count");
 const accountsList = document.querySelector("#accounts");
 const emptyState = document.querySelector("#empty-state");
@@ -27,22 +26,39 @@ const STORAGE_KEY = "mfaAccounts";
 const PERIOD = 30;
 const { base32ToBytes, generateTotp } = AuthenticatorTOTP;
 let pendingDeleteId = null;
-let reorderMode = false;
-let reorderPointerItem = null;
-let reorderPointerMoved = false;
 let renderVersion = 0;
 
 /**
- * 编辑模式拖动结束后，保存当前 DOM 中的账户顺序。
+ * 记录验证器的使用次数。
  *
+ * @param {string} accountId 已使用的验证器 ID。
  * @returns {Promise<void>} 完成 Promise。
  */
-async function saveCurrentOrder() {
-  const order = [...accountsList.children].map((element) => element.dataset.accountId);
+async function recordAccountUse(accountId) {
   const { [STORAGE_KEY]: savedAccounts = [] } = await chrome.storage.local.get(STORAGE_KEY);
-  const position = new Map(order.map((id, index) => [id, index]));
-  await chrome.storage.local.set({
-    [STORAGE_KEY]: [...savedAccounts].sort((left, right) => position.get(left.id) - position.get(right.id)),
+  const accounts = savedAccounts.map((account) => account.id === accountId
+    ? { ...account, usageCount: (Number(account.usageCount) || 0) + 1 }
+    : account);
+  await chrome.storage.local.set({ [STORAGE_KEY]: accounts });
+}
+
+/**
+ * 判断存储变化是否只涉及账户使用次数。
+ *
+ * @param {{oldValue?: object[], newValue?: object[]}} change 存储变化详情。
+ * @returns {boolean} 是否可直接复用现有卡片。
+ */
+function isUsageCountChange(change) {
+  const previous = change.oldValue || [];
+  const next = change.newValue || [];
+  if (previous.length !== next.length) return false;
+  const previousById = new Map(previous.map((account) => [account.id, account]));
+  return next.every((account) => {
+    const previousAccount = previousById.get(account.id);
+    if (!previousAccount) return false;
+    const { usageCount: previousUsageCount, ...previousDetails } = previousAccount;
+    const { usageCount, ...details } = account;
+    return JSON.stringify(previousDetails) === JSON.stringify(details);
   });
 }
 
@@ -71,6 +87,7 @@ async function renderAccounts() {
   const currentVersion = ++renderVersion;
   const { [STORAGE_KEY]: accounts = [] } = await chrome.storage.local.get(STORAGE_KEY);
   if (currentVersion !== renderVersion) return;
+  accounts.sort((left, right) => (Number(right.usageCount) || 0) - (Number(left.usageCount) || 0));
   accountsList.replaceChildren();
   emptyState.hidden = accounts.length > 0;
   accountCount.textContent = `${accounts.length} 个验证器`;
@@ -80,7 +97,6 @@ async function renderAccounts() {
     const item = document.createElement("li");
     item.className = "account-item";
     item.dataset.accountId = account.id;
-    item.draggable = false;
     item.tabIndex = 0;
     item.setAttribute("role", "button");
     item.setAttribute("aria-label", `复制 ${labels.issuer} 的当前验证码`);
@@ -106,18 +122,19 @@ async function renderAccounts() {
       if (!/^\d{6}$/.test(code)) return;
       await navigator.clipboard.writeText(code);
       await chrome.runtime.sendMessage({ type: "FILL_TOTP", code }).catch(() => null);
+      await recordAccountUse(account.id);
       const copyHint = item.querySelector(".copy-hint");
       copyHint.hidden = false;
       window.setTimeout(() => { copyHint.hidden = true; }, 500);
     };
     item.addEventListener("click", () => {
-      if (reorderMode) return;
+      if (accountsList.classList.contains("is-manage-mode")) return;
       copyCode().catch(() => {});
     });
     item.addEventListener("keydown", (event) => {
       if (event.key === "Enter" || event.key === " ") {
         event.preventDefault();
-        if (reorderMode) return;
+        if (accountsList.classList.contains("is-manage-mode")) return;
         copyCode().catch(() => {});
       }
     });
@@ -126,29 +143,6 @@ async function renderAccounts() {
       pendingDeleteId = account.id;
       confirmAccount.textContent = `${labels.issuer}（${labels.account}）`;
       deleteConfirm.hidden = false;
-    });
-    item.addEventListener("pointerdown", (event) => {
-      if (!reorderMode || event.button !== 0 || event.target.closest("button")) return;
-      event.preventDefault();
-      reorderPointerItem = item;
-      reorderPointerMoved = false;
-      item.setPointerCapture(event.pointerId);
-      item.classList.add("is-dragging");
-    });
-    item.addEventListener("pointermove", (event) => {
-      if (!reorderPointerItem) return;
-      const target = document.elementFromPoint(event.clientX, event.clientY)?.closest(".account-item");
-      if (!target || target === reorderPointerItem || !accountsList.contains(target)) return;
-      reorderPointerMoved = true;
-      const box = target.getBoundingClientRect();
-      accountsList.insertBefore(reorderPointerItem, event.clientY > box.top + box.height / 2 ? target.nextSibling : target);
-    });
-    item.addEventListener("pointerup", async () => {
-      if (!reorderPointerItem) return;
-      const movedItem = reorderPointerItem;
-      reorderPointerItem = null;
-      movedItem.classList.remove("is-dragging");
-      if (reorderPointerMoved) await saveCurrentOrder();
     });
     accountsList.append(item);
   }
@@ -193,7 +187,9 @@ function updateCountdowns() {
 renderAccounts();
 
 chrome.storage.onChanged.addListener((changes, areaName) => {
-  if (areaName === "local" && changes[STORAGE_KEY]) renderAccounts();
+  if (areaName !== "local" || !changes[STORAGE_KEY]) return;
+  if (isUsageCountChange(changes[STORAGE_KEY])) return;
+  renderAccounts();
 });
 
 setInterval(updateCountdowns, 1000);
@@ -261,14 +257,11 @@ exportAccountsButton?.addEventListener("click", async () => {
   URL.revokeObjectURL(url);
 });
 
-toggleReorderButton?.addEventListener("click", async () => {
-  reorderMode = !reorderMode;
-  toggleReorderButton.classList.toggle("is-active", reorderMode);
-  toggleReorderButton.setAttribute("aria-pressed", String(reorderMode));
-  toggleReorderButton.title = reorderMode ? "完成编辑" : "编辑";
-  reorderHint.hidden = !reorderMode;
-  accountsList.classList.toggle("is-reorder-mode", reorderMode);
-  await renderAccounts();
+toggleManageButton?.addEventListener("click", () => {
+  const manageMode = accountsList.classList.toggle("is-manage-mode");
+  toggleManageButton.classList.toggle("is-active", manageMode);
+  toggleManageButton.setAttribute("aria-pressed", String(manageMode));
+  toggleManageButton.title = manageMode ? "完成管理" : "管理";
 });
 
 importSubmit?.addEventListener("click", async () => {
