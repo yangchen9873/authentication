@@ -262,10 +262,10 @@ async function cleanupScan(tabId) {
 }
 
 /**
- * 尝试将复制的验证码填入当前页面匹配的输入框。
+ * 尝试将复制的验证码填入当前页面匹配的输入框，并尽量自动提交/登录。
  *
  * @param {string} code 6 位 TOTP 验证码。
- * @returns {Promise<{filled: boolean}>} 是否找到并填充了输入框。
+ * @returns {Promise<{filled: boolean, submitted?: boolean}>} 是否填充、是否提交。
  */
 async function fillTotpOnActiveTab(code) {
   if (!/^\d{6}$/.test(code)) throw new Error("验证码格式无效。");
@@ -283,29 +283,70 @@ async function fillTotpOnActiveTab(code) {
         const style = getComputedStyle(element);
         return !element.disabled && style.display !== "none" && style.visibility !== "hidden" && element.getClientRects().length > 0;
       };
+      const buttonText = (element) =>
+        `${element.innerText || ""} ${element.value || ""} ${element.getAttribute("aria-label") || ""} ${element.title || ""}`.trim().toLowerCase();
+      const trySubmitNear = (anchor) => {
+        const form = anchor?.closest?.("form");
+        if (form) {
+          const submitControl = [...form.querySelectorAll('button, input[type="submit"], input[type="button"]')]
+            .filter(isVisible)
+            .find((el) => {
+              const type = (el.getAttribute("type") || "").toLowerCase();
+              const text = buttonText(el);
+              if (type === "reset" || /resend|重新发送|cancel|取消|back|返回|forgot/.test(text)) return false;
+              return type === "submit" || /submit|verify|confirm|continue|next|login|sign.?in|验证|确认|继续|下一步|登录|确定/.test(text);
+            });
+          if (submitControl) {
+            submitControl.click();
+            return true;
+          }
+          if (typeof form.requestSubmit === "function") {
+            form.requestSubmit();
+            return true;
+          }
+          form.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
+          return true;
+        }
+
+        const candidates = [...document.querySelectorAll('button, input[type="submit"], input[type="button"], [role="button"]')]
+          .filter(isVisible)
+          .filter((el) => {
+            const type = (el.getAttribute("type") || "").toLowerCase();
+            const text = buttonText(el);
+            if (type === "reset" || /resend|重新发送|cancel|取消|back|返回|forgot/.test(text)) return false;
+            return type === "submit" || /submit|verify|confirm|continue|next|login|sign.?in|验证|确认|继续|下一步|登录|确定/.test(text);
+          });
+        if (!candidates.length) return false;
+        candidates[0].click();
+        return true;
+      };
+
       const inputs = [...document.querySelectorAll("input")].filter(isVisible);
       const digitInputs = inputs.filter((input) => input.maxLength === 1);
       if (digitInputs.length >= token.length) {
-        digitInputs.slice(0, token.length).forEach((input, index) => {
+        const filledDigits = digitInputs.slice(0, token.length);
+        filledDigits.forEach((input, index) => {
           input.focus();
           input.value = token[index];
           notify(input);
         });
-        digitInputs[token.length - 1].focus();
-        return { filled: true };
+        filledDigits[token.length - 1].focus();
+        const submitted = trySubmitNear(filledDigits[0]);
+        return { filled: true, submitted };
       }
 
       const codeField = inputs.find((input) => {
         const descriptor = `${input.autocomplete} ${input.name} ${input.id} ${input.placeholder} ${input.className}`.toLowerCase();
         return input.autocomplete === "one-time-code" || /\b(otp|totp|2fa|mfa|verification|verify|code)\b|验证码/.test(descriptor);
       });
-      if (!codeField) return { filled: false };
+      if (!codeField) return { filled: false, submitted: false };
       codeField.focus();
       codeField.value = token;
       notify(codeField);
-      return { filled: true };
+      const submitted = trySubmitNear(codeField);
+      return { filled: true, submitted };
     },
     args: [code],
   });
-  return result || { filled: false };
+  return result || { filled: false, submitted: false };
 }
