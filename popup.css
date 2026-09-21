@@ -111,12 +111,12 @@ main {
   align-items: center;
   grid-template-columns: minmax(0, 1fr) auto;
   gap: 10px;
-  padding: 6px 12px;
+  padding: 8px 12px;
   border: 1px solid var(--border);
   border-radius: 11px;
   background: var(--surface);
   color: var(--text);
-  min-height: 56px;
+  min-height: 68px;
   overflow-wrap: anywhere;
   cursor: pointer;
   box-shadow: 0 1px 2px rgba(22, 24, 29, .02);
@@ -137,15 +137,27 @@ main {
 .code-row { display: flex; align-items: baseline; gap: 6px; min-width: 0; }
 .copy-hint { flex: 0 0 auto; color: var(--accent); font-size: 11px; }
 
-.account-meta {
+.account-name {
+  color: var(--text);
+  overflow: hidden;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 16px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.account-sub {
   color: var(--muted);
   overflow: hidden;
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 400;
   line-height: 14px;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+
+.account-sub[hidden] { display: none; }
 
 .account-delete {
   position: absolute;
@@ -196,7 +208,7 @@ main {
 .token-code {
   color: var(--code);
   font-family: "SF Mono", "Cascadia Mono", "JetBrains Mono", "Roboto Mono", SFMono-Regular, Menlo, Consolas, ui-monospace, monospace;
-  font-size: 24px;
+  font-size: 21px;
   font-variant-numeric: tabular-nums;
   font-weight: 600;
   letter-spacing: 1px;

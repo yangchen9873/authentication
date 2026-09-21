@@ -138,8 +138,9 @@ async function renderAccounts() {
     item.setAttribute("aria-label", `复制 ${labels.issuer} 的当前验证码`);
     item.innerHTML = `
       <div class="account-details">
-        <div class="account-meta"></div>
+        <div class="account-name"></div>
         <div class="code-row"><span class="token-code">------</span><span class="copy-hint" hidden>已复制</span></div>
+        <div class="account-sub" hidden></div>
       </div>
       <div class="account-controls">
         <button class="account-qr" type="button" aria-label="显示 ${labels.issuer} 的二维码" title="显示二维码">
@@ -149,9 +150,11 @@ async function renderAccounts() {
       </div>
       <button class="account-delete" type="button" aria-label="删除 ${labels.issuer}">×</button>
     `;
-    item.querySelector(".account-meta").textContent = labels.issuer && labels.account
-      ? `${labels.issuer}（${labels.account}）`
-      : labels.issuer || labels.account;
+    item.querySelector(".account-name").textContent = labels.issuer || labels.account;
+    const accountSub = item.querySelector(".account-sub");
+    const subtitle = labels.issuer && labels.account ? labels.account : "";
+    accountSub.textContent = subtitle;
+    accountSub.hidden = !subtitle;
     try {
       item.querySelector(".token-code").textContent = await generateTotp(account.secret);
     } catch {
