@@ -33,7 +33,7 @@ html, body {
 }
 
 body {
-  width: 300px;
+  width: 280px;
   height: 456px;
   background: var(--bg);
   color: var(--text);
